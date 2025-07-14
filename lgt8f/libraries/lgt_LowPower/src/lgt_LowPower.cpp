@@ -946,8 +946,27 @@ void    LowPowerClass::powerDown(period_t period, adc_t adc, bod_t bod)
     }
 
     if (period != SLEEP_FOREVER)
-    {
-        wdt_ienable(period);
+    { 
+        // properly set the WDT to interrupt mode(not interrupt reset mode)
+        // this code is from the enable_wdt() in PMU.cpp
+        uint8_t btmp;
+
+        asm ("wdr");
+
+        // disable WDE
+        btmp = (WDTCSR | 0x90) & 0xF7;
+        WDTCSR = 0x18 | btmp;
+        WDTCSR &= 0xF7;
+
+        // enable wdt
+        btmp = period & 0x7;	// WPD[2:0]
+        if(period > SLEEP_8S)
+            btmp |= 0x20;	// WPD[3]
+
+        btmp |= 0x40;	// WDIE enable
+        btmp |= 0x10;	// WDCE enable
+        WDTCSR = 0x18 | btmp;
+        WDTCSR = btmp;
     }
     else
     {
@@ -968,7 +987,7 @@ void    LowPowerClass::powerDown(period_t period, adc_t adc, bod_t bod)
  
     lowPowerLdoOff(SLEEP_MODE_PWR_DOWN);
 
-    if (bod == BOD_OFF) s_unlockWrite(VDTCR,o_vdtcr);
+    // if (bod == BOD_OFF) s_unlockWrite(VDTCR,o_vdtcr); //reenabling BOD causes reset for an unknown reason
 
 //    power2_swd_enable();                   // Timed sequence.
 
